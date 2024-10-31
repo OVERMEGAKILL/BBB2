@@ -1,5 +1,6 @@
 import discord
-from discord.ext import commands, tasks
+from discord.ext import tasks
+from discord_slash import SlashCommand, SlashContext
 from datetime import datetime, timedelta
 import os
 
@@ -9,7 +10,10 @@ with open('/run/secrets/channel_id') as f:
     CHANNEL_ID = int(f.read().strip())
 
 intents = discord.Intents.default()
-bot = commands.Bot(command_prefix="!", intents=intents)
+intents.message_content = True
+
+bot = discord.Client(intents=intents)
+slash = SlashCommand(bot, sync_commands=True)
 
 role_weights = {
     "Squire": 2,
@@ -26,14 +30,25 @@ async def on_ready():
     print(f'Connecté en tant que {bot.user}')
     check_votes.start()
 
-@bot.command(name='start_vote')
-async def start_vote(ctx, duration: int, *options_with_urls):
-    if not options_with_urls:
-        await ctx.send("Veuillez fournir des options de vote avec des URL d'images.")
-        return
-
+@slash.slash(name="start_vote", description="Démarre un vote avec des options et des images", options=[
+    {
+        "name": "duration",
+        "description": "Durée du vote en secondes",
+        "type": 4,  # INTEGER
+        "required": True
+    },
+    {
+        "name": "options",
+        "description": "Options de vote et URL des images (option1 url1 option2 url2 ...)",
+        "type": 3,  # STRING
+        "required": True
+    }
+])
+async def _start_vote(ctx: SlashContext, duration: int, options: str):
+    options_with_urls = options.split()
+    
     if len(options_with_urls) % 2 != 0:
-        await ctx.send("Assurez-vous de fournir une paire d'options et d'URL d'images pour chaque option.")
+        await ctx.send("Assurez-vous de fournir une paire d'options et d'URL d'images pour chaque option.", hidden=True)
         return
 
     embed = discord.Embed(title="Votez pour votre favori", description="Réagissez avec l'emoji correspondant pour voter.", color=0x00ff00)
@@ -53,7 +68,7 @@ async def start_vote(ctx, duration: int, *options_with_urls):
 
     votes[vote_message.id] = {}
     vote_end_times[vote_message.id] = datetime.utcnow() + timedelta(seconds=duration)
-    await ctx.send(f"Le vote se terminera dans {duration} secondes.")
+    await ctx.send(f"Le vote se terminera dans {duration} secondes.", hidden=True)
 
 @bot.event
 async def on_reaction_add(reaction, user):
