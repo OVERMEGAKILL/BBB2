@@ -1,6 +1,7 @@
 import discord
 from discord.ext import commands, tasks
 from datetime import datetime, timedelta
+import os
 
 intents = discord.Intents.default()
 bot = commands.Bot(command_prefix="!", intents=intents)
@@ -82,7 +83,7 @@ async def check_votes():
     ended_votes = [msg_id for msg_id, end_time in vote_end_times.items() if end_time <= now]
 
     for msg_id in ended_votes:
-        vote_message = await bot.get_channel(CHANNEL_ID).fetch_message(msg_id)
+        vote_message = await bot.get_channel(int(os.getenv('CHANNEL_ID'))).fetch_message(msg_id)
         results = {}
         for option, weight in votes[msg_id].values():
             if option in results:
@@ -100,4 +101,4 @@ async def check_votes():
         del votes[msg_id]
         del vote_end_times[msg_id]
 
-bot.run('BOT_TOKEN')
+bot.run(os.getenv('BOT_TOKEN'))
