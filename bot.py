@@ -3,6 +3,11 @@ from discord.ext import commands, tasks
 from datetime import datetime, timedelta
 import os
 
+with open('/run/secrets/bot_token') as f:
+    BOT_TOKEN = f.read().strip()
+with open('/run/secrets/channel_id') as f:
+    CHANNEL_ID = int(f.read().strip())
+
 intents = discord.Intents.default()
 bot = commands.Bot(command_prefix="!", intents=intents)
 
@@ -19,7 +24,7 @@ vote_end_times = {}
 @bot.event
 async def on_ready():
     print(f'Connecté en tant que {bot.user}')
-    check_votes.start()  # Start the task to check for vote deadlines
+    check_votes.start()
 
 @bot.command(name='start_vote')
 async def start_vote(ctx, duration: int, *options_with_urls):
@@ -39,13 +44,13 @@ async def start_vote(ctx, duration: int, *options_with_urls):
         emoji = chr(0x1F1E6 + (i // 2))
         embed.add_field(name=option, value=f"Réagissez avec {emoji}", inline=False)
         embed.set_image(url=image_url)
-    
+
     vote_message = await ctx.send(embed=embed)
-    
+
     for i in range(len(options_with_urls) // 2):
         emoji = chr(0x1F1E6 + i)
         await vote_message.add_reaction(emoji)
-    
+
     votes[vote_message.id] = {}
     vote_end_times[vote_message.id] = datetime.utcnow() + timedelta(seconds=duration)
     await ctx.send(f"Le vote se terminera dans {duration} secondes.")
@@ -83,14 +88,14 @@ async def check_votes():
     ended_votes = [msg_id for msg_id, end_time in vote_end_times.items() if end_time <= now]
 
     for msg_id in ended_votes:
-        vote_message = await bot.get_channel(int(os.getenv('CHANNEL_ID'))).fetch_message(msg_id)
+        vote_message = await bot.get_channel(CHANNEL_ID).fetch_message(msg_id)
         results = {}
         for option, weight in votes[msg_id].values():
             if option in results:
                 results[option] += weight
             else:
                 results[option] = weight
-        
+
         results_message = "\n".join([f'{option}: {weight} votes' for option, weight in results.items()])
         await vote_message.channel.send(f'Le vote est terminé! Résultats:\n{results_message}')
 
@@ -101,4 +106,4 @@ async def check_votes():
         del votes[msg_id]
         del vote_end_times[msg_id]
 
-bot.run(os.getenv('BOT_TOKEN'))
+bot.run(BOT_TOKEN)
